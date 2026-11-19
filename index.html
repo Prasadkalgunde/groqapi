@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#211C19">
+  <title>LLM Explorer — Learning Laboratory</title>
+  <meta name="description" content="An interactive learning laboratory for exploring large language models, prompts, tokens, embeddings, and more.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #211C19;
+      --surface: #302720;
+      --surface-2: #3a2f27;
+      --surface-3: #44372D;
+      --border: #594638;
+      --accent: #A88768;
+      --accent-2: #C7A98A;
+      --highlight: #D8BEA3;
+      --text: #EEE3D5;
+      --secondary: #B9A895;
+      --muted: #8F8174;
+      --success: #9AAF91;
+      --warning: #D1A66A;
+      --error: #C77D70;
+      --sans: "DM Sans", Inter, ui-sans-serif, system-ui, sans-serif;
+      --display: "Space Grotesk", var(--sans);
+      --mono: "DM Mono", "SFMono-Regular", Consolas, monospace;
+      --radius: 16px;
+      --shadow: 0 16px 42px rgba(0,0,0,.16);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; min-width: 320px; min-height: 100vh; color: var(--text); font-family: var(--sans);
+      background: radial-gradient(ellipse at 48% -15%, rgba(168,135,104,.14), transparent 40%), var(--bg);
+      font-size: 14px; line-height: 1.55;
+    }
+    button, input, textarea { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
+      outline: 2px solid var(--highlight); outline-offset: 3px;
+    }
+    .app-shell { display: grid; grid-template-columns: 248px minmax(0,1fr) 286px; min-height: 100vh; }
+    .sidebar {
+      border-right: 1px solid rgba(89,70,56,.6); padding: 26px 16px 20px; display:flex; flex-direction:column;
+      position: sticky; top:0; height:100vh; background:rgba(33,28,25,.86); z-index:5;
+    }
+    .brand { display:flex; align-items:center; gap:11px; padding: 0 10px 28px; color:var(--text); text-decoration:none; }
+    .brand-mark { width:32px; height:32px; border-radius:10px; display:grid; place-items:center; background:linear-gradient(145deg,#c7a98a,#806044); color:#211c19; font-family:var(--display); font-weight:700; font-size:16px; }
+    .brand-name { font:600 16px var(--display); letter-spacing:-.4px; }
+    .brand-name span { color:var(--accent-2); }
+    .nav-label { color:var(--muted); text-transform:uppercase; font:500 10px var(--mono); letter-spacing:1.2px; padding:0 12px 9px; }
+    .nav-list { display:grid; gap:4px; }
+    .nav-item { width:100%; display:flex; align-items:center; gap:12px; border:1px solid transparent; background:transparent; color:var(--secondary); border-radius:10px; padding:10px 12px; cursor:pointer; text-align:left; transition:background .18s,border .18s,color .18s; }
+    .nav-item:hover { color:var(--text); background:rgba(168,135,104,.08); }
+    .nav-item.active { color:var(--highlight); background:rgba(168,135,104,.14); border-color:rgba(168,135,104,.2); }
+    .nav-icon { width:17px; text-align:center; font-size:15px; color:var(--accent-2); }
+    .nav-item span:last-child { font-size:13px; font-weight:500; }
+    .sidebar-bottom { margin-top:auto; }
+    .sidebar-note { background:linear-gradient(145deg,rgba(68,55,45,.8),rgba(48,39,32,.65)); border:1px solid var(--border); border-radius:13px; padding:14px; color:var(--secondary); font-size:12px; }
+    .sidebar-note strong { color:var(--text); display:block; font-size:12px; margin-bottom:5px; }
+    .sidebar-note .note-dot { width:7px; height:7px; background:var(--success); border-radius:50%; display:inline-block; margin-right:6px; }
+    .workspace { min-width:0; padding:0 34px 50px; }
+    .topbar { height:76px; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid rgba(89,70,56,.42); margin-bottom:30px; }
+    .breadcrumb { color:var(--muted); font-size:12px; }
+    .breadcrumb strong { color:var(--secondary); font-weight:500; }
+    .top-actions { display:flex; align-items:center; gap:10px; }
+    .sim-chip { display:flex; gap:7px; align-items:center; font:500 10px var(--mono); letter-spacing:.6px; color:var(--warning); border:1px solid rgba(209,166,106,.3); background:rgba(209,166,106,.08); padding:6px 9px; border-radius:7px; }
+    .sim-chip i { width:6px; height:6px; border-radius:50%; background:var(--warning); }
+    .icon-button { border:1px solid var(--border); background:var(--surface); width:34px; height:34px; border-radius:9px; cursor:pointer; color:var(--secondary); display:grid; place-items:center; }
+    .mobile-brand, #sidebarToggle { display:none; }
+    .page { display:none; animation:enter .24s ease both; }
+    .page.active { display:block; }
+    @keyframes enter { from {opacity:0;transform:translateY(4px)} to {opacity:1;transform:none} }
+    .page-head { margin: 0 0 24px; }
+    .eyebrow { color:var(--accent-2); text-transform:uppercase; font:500 10px var(--mono); letter-spacing:1.5px; margin:0 0 8px; }
+    h1,h2,h3,h4 { font-family:var(--display); letter-spacing:-.5px; }
+    h1 { font-size:clamp(25px,3vw,34px); line-height:1.15; margin:0 0 9px; font-weight:600; }
+    h2 { font-size:20px; margin:0; font-weight:600; }
+    h3 { font-size:15px; margin:0; font-weight:600; }
+    p { margin:0; }
+    .lead { color:var(--secondary); max-width:700px; font-size:13px; }
+    .card { border:1px solid var(--border); background:linear-gradient(145deg,rgba(58,47,39,.94),rgba(48,39,32,.94)); border-radius:var(--radius); box-shadow:var(--shadow); }
+    .card-head { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:16px; }
+    .card-title { display:flex; align-items:center; gap:9px; }
+    .card-icon { color:var(--accent-2); font-size:15px; }
+    .muted { color:var(--muted); }
+    .small { font-size:11px; }
+    .mono { font-family:var(--mono); }
+    .pill { font:500 10px var(--mono); padding:4px 7px; border:1px solid rgba(168,135,104,.32); border-radius:6px; color:var(--accent-2); background:rgba(168,135,104,.08); }
+    .play-layout { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(300px,.95fr); gap:17px; align-items:start; }
+    .editor-card,.output-card,.settings-card { padding:19px; }
+    .editor-label { display:flex; align-items:center; justify-content:space-between; color:var(--secondary); font-size:11px; font-weight:600; margin:0 0 7px; }
+    textarea, input[type="text"], input[type="search"] {
+      width:100%; color:var(--text); background:rgba(33,28,25,.72); border:1px solid var(--border); border-radius:9px;
+      padding:11px 12px; resize:vertical; line-height:1.6; transition:border .16s,background .16s;
+    }
+    textarea:focus, input:focus { border-color:var(--accent); background:rgba(33,28,25,.95); outline:none; }
+    textarea::placeholder,input::placeholder { color:#77695c; }
+    .system-text { min-height:72px; margin-bottom:15px; font-size:12px; }
+    .user-text { min-height:146px; font-size:13px; }
+    .examples-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+    .text-button { color:var(--accent-2); border:0; padding:3px 4px; background:none; cursor:pointer; font-size:11px; }
+    .text-button:hover { color:var(--highlight); text-decoration:underline; }
+    .button-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:16px; }
+    .btn { border:1px solid var(--border); background:var(--surface-3); padding:9px 13px; border-radius:9px; cursor:pointer; color:var(--text); font-weight:600; font-size:12px; transition:transform .16s,background .16s,border .16s; }
+    .btn:hover { background:#514237; border-color:#80634c; transform:translateY(-1px); }
+    .btn:disabled { opacity:.55; cursor:wait; transform:none; }
+    .btn-primary { background:linear-gradient(135deg,#b39070,#8b6c50); color:#1e1915; border-color:#b39070; }
+    .btn-primary:hover { background:linear-gradient(135deg,#d0b18f,#a88768); }
+    .btn-quiet { background:transparent; color:var(--secondary); }
+    .btn-sm { font-size:10px; padding:6px 9px; }
+    .output-card { min-height:280px; }
+    .output-empty { min-height:185px; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; color:var(--muted); padding:20px; }
+    .empty-icon { width:44px; height:44px; display:grid; place-items:center; border-radius:13px; color:var(--accent-2); background:rgba(168,135,104,.12); font-size:21px; margin-bottom:12px; }
+    .output-empty strong { color:var(--secondary); font-size:12px; margin-bottom:5px; }
+    .output-body { display:none; color:var(--text); font-size:13px; white-space:pre-wrap; min-height:130px; }
+    .output-meta { color:var(--muted); display:flex; justify-content:space-between; margin-top:13px; font:10px var(--mono); }
+    .settings-card { grid-column:1/-1; }
+    .setting-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:15px; }
+    .setting-mini { background:rgba(33,28,25,.4); border:1px solid rgba(89,70,56,.65); border-radius:11px; padding:12px; }
+    .setting-top { display:flex; justify-content:space-between; gap:8px; align-items:center; margin-bottom:8px; }
+    .setting-top label { font-size:11px; font-weight:600; color:var(--secondary); }
+    .setting-value { color:var(--highlight); font:12px var(--mono); }
+    input[type="range"] { width:100%; accent-color:var(--accent-2); cursor:pointer; height:4px; }
+    .range-limits { display:flex; justify-content:space-between; color:var(--muted); font:9px var(--mono); margin-top:2px; }
+    .setting-note { color:var(--muted); font-size:10px; line-height:1.4; margin-top:7px; }
+    .parameter-page-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .parameter-detail { padding:18px; }
+    .parameter-detail p { color:var(--secondary); font-size:12px; margin-top:8px; }
+    .example-compare { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:13px; }
+    .example-box { border:1px solid var(--border); border-radius:9px; padding:11px; background:rgba(33,28,25,.45); color:var(--secondary); font-size:11px; }
+    .example-box b { display:block; color:var(--accent-2); font:10px var(--mono); margin-bottom:5px; }
+    .candidate-list { display:flex; gap:7px; flex-wrap:wrap; margin-top:14px; }
+    .candidate { border:1px solid var(--border); background:rgba(33,28,25,.5); color:var(--secondary); border-radius:7px; padding:6px 9px; font:11px var(--mono); }
+    .candidate.included { color:var(--highlight); border-color:var(--accent); background:rgba(168,135,104,.18); }
+    .prompt-modes { display:flex; gap:6px; background:rgba(33,28,25,.56); padding:5px; border:1px solid var(--border); border-radius:10px; width:max-content; margin-bottom:16px; }
+    .mode-tab { border:0; border-radius:7px; background:transparent; color:var(--secondary); padding:7px 12px; cursor:pointer; font-size:11px; }
+    .mode-tab.active { background:var(--surface-3); color:var(--highlight); }
+    .prompt-lab-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .prompt-pane { padding:18px; }
+    .prompt-pane textarea { min-height:90px; font-size:12px; }
+    .example-editor { display:grid; gap:8px; margin:13px 0; }
+    .example-pair { display:grid; grid-template-columns:1fr 1fr auto; gap:7px; align-items:start; }
+    .example-pair textarea { min-height:57px; padding:8px; font-size:11px; }
+    .remove-example { border:0; background:transparent; color:var(--muted); cursor:pointer; padding:7px; }
+    .remove-example:hover { color:var(--error); }
+    .assembled { min-height:245px; white-space:pre-wrap; font:11px/1.7 var(--mono); color:var(--secondary); background:rgba(33,28,25,.7); border:1px solid var(--border); border-radius:9px; padding:13px; }
+    .count-line { display:flex; justify-content:space-between; margin-top:9px; color:var(--muted); font:10px var(--mono); }
+    .analyzer-grid { display:grid; grid-template-columns:minmax(220px,.7fr) minmax(0,1.3fr); gap:17px; }
+    .analyzer-input,.analysis-result { padding:19px; }
+    .analyzer-input textarea { min-height:230px; }
+    .score-overview { display:flex; align-items:center; gap:16px; border-bottom:1px solid var(--border); padding-bottom:16px; margin-bottom:14px; }
+    .score-ring { width:70px; height:70px; border-radius:50%; border:5px solid var(--accent); display:grid; place-items:center; color:var(--highlight); font:18px var(--mono); flex:none; }
+    .score-ring span { font-size:9px; color:var(--muted); display:block; text-align:center; margin-top:-20px; }
+    .score-label { font:10px var(--mono); color:var(--accent-2); text-transform:uppercase; letter-spacing:.8px; }
+    .score-overview p { font-size:11px; color:var(--secondary); margin-top:3px; }
+    .category-row { display:grid; grid-template-columns:100px 1fr 30px; align-items:center; gap:9px; margin:11px 0; font-size:11px; color:var(--secondary); }
+    .bar-track { height:6px; background:rgba(33,28,25,.85); border-radius:9px; overflow:hidden; }
+    .bar-fill { height:100%; width:0; border-radius:9px; background:linear-gradient(90deg,var(--accent),var(--success)); transition:width .3s; }
+    .category-score { color:var(--accent-2); text-align:right; font:10px var(--mono); }
+    .suggestions { margin-top:16px; padding-top:14px; border-top:1px solid var(--border); }
+    .suggestions ul { margin:8px 0 0; padding-left:17px; color:var(--secondary); font-size:11px; }
+    .suggestions li { margin:5px 0; }
+    .notice { border-left:2px solid var(--warning); padding:8px 10px; color:var(--secondary); font-size:10px; background:rgba(209,166,106,.06); margin-top:12px; }
+    .token-input-card,.token-results { padding:19px; }
+    .token-input-card textarea { min-height:128px; }
+    .token-stats { display:flex; flex-wrap:wrap; gap:9px; margin:13px 0; }
+    .stat-chip { border:1px solid var(--border); background:rgba(33,28,25,.45); border-radius:8px; padding:7px 10px; color:var(--secondary); font-size:10px; }
+    .stat-chip strong { color:var(--highlight); font:12px var(--mono); margin-right:4px; }
+    .token-cloud { min-height:96px; display:flex; flex-wrap:wrap; align-content:flex-start; gap:6px; padding:12px; background:rgba(33,28,25,.52); border:1px dashed var(--border); border-radius:10px; }
+    .token-chip { padding:4px 7px; border-radius:5px; border:1px solid rgba(199,169,138,.25); color:var(--highlight); font:11px var(--mono); background:rgba(168,135,104,.16); }
+    .token-chip:nth-child(4n+2) { background:rgba(130,151,122,.16); border-color:rgba(130,151,122,.32); color:#c0cfb7; }
+    .token-chip:nth-child(4n+3) { background:rgba(199,125,112,.14); border-color:rgba(199,125,112,.3); color:#ddb0a7; }
+    .token-chip:nth-child(4n) { background:rgba(209,166,106,.14); border-color:rgba(209,166,106,.3); color:#dec296; }
+    .token-examples { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+    .two-col { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .embedding-card,.embedding-info { padding:18px; }
+    .embedding-stage { width:100%; height:380px; background:radial-gradient(ellipse at center,rgba(168,135,104,.08),transparent 70%),rgba(33,28,25,.46); border:1px solid var(--border); border-radius:11px; }
+    .embedding-stage svg { width:100%; height:100%; overflow:visible; }
+    .gridline { stroke:rgba(185,168,149,.1); stroke-width:1; }
+    .axis { stroke:rgba(185,168,149,.25); stroke-width:1; }
+    .point { cursor:pointer; stroke:#211c19; stroke-width:2; transition:r .16s,filter .16s; }
+    .point:hover,.point:focus { r:8; filter:brightness(1.25); outline:none; }
+    .point-label { fill:var(--secondary); font:11px var(--mono); pointer-events:none; }
+    .embedding-tooltip { min-height:48px; color:var(--secondary); font-size:11px; margin-top:10px; }
+    .legend { display:flex; flex-wrap:wrap; gap:10px; margin-top:12px; font-size:10px; color:var(--secondary); }
+    .legend i { width:8px; height:8px; display:inline-block; border-radius:50%; margin-right:5px; }
+    .reasoning-intro,.search-card,.about-card { padding:19px; }
+    .pipeline { display:grid; gap:8px; margin-top:18px; }
+    .pipeline-stage { display:grid; grid-template-columns:38px minmax(0,1fr) auto; align-items:center; gap:12px; background:rgba(33,28,25,.43); border:1px solid var(--border); border-radius:11px; padding:12px; transition:border .2s,background .2s; }
+    .pipeline-stage.current { border-color:var(--accent); background:rgba(168,135,104,.11); }
+    .stage-icon { width:34px; height:34px; border-radius:9px; display:grid; place-items:center; color:var(--accent-2); background:rgba(168,135,104,.13); }
+    .stage-copy h3 { font-size:12px; margin-bottom:2px; }
+    .stage-copy p { color:var(--muted); font-size:10px; }
+    .stage-detail { display:none; grid-column:2/4; color:var(--secondary); font-size:11px; border-top:1px solid rgba(89,70,56,.55); padding-top:10px; }
+    .pipeline-stage.expanded .stage-detail { display:block; }
+    .stage-expand { border:1px solid var(--border); background:transparent; color:var(--muted); border-radius:6px; padding:5px 8px; cursor:pointer; font-size:10px; }
+    .stage-expand:hover { color:var(--highlight); }
+    .search-controls { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:12px; margin:18px 0; }
+    .switch { appearance:none; width:39px; height:22px; background:#55483d; border-radius:20px; position:relative; cursor:pointer; transition:.2s; }
+    .switch::after { content:""; position:absolute; width:16px; height:16px; border-radius:50%; top:3px; left:3px; background:#c9b9a8; transition:.2s; }
+    .switch:checked { background:#8d7259; }
+    .switch:checked::after { left:20px; background:#f0e2d2; }
+    .workflow { display:grid; grid-template-columns:repeat(5,1fr); gap:9px; align-items:stretch; margin:21px 0; }
+    .workflow-step { text-align:center; padding:13px 7px; border:1px solid var(--border); background:rgba(33,28,25,.45); border-radius:10px; color:var(--muted); font-size:10px; position:relative; }
+    .workflow-step:not(:last-child)::after { content:"→"; position:absolute; right:-10px; top:40%; color:var(--accent); z-index:1; }
+    .workflow-step b { display:block; color:var(--secondary); font-size:11px; margin-top:8px; }
+    .workflow-step span { color:var(--accent-2); font-size:17px; }
+    .workflow-step.active { border-color:var(--accent); background:rgba(168,135,104,.13); }
+    .workflow-step.complete { border-color:rgba(130,151,122,.6); }
+    .learning-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+    .learn-card { border:1px solid var(--border); background:linear-gradient(145deg,rgba(58,47,39,.82),rgba(48,39,32,.88)); border-radius:12px; overflow:hidden; }
+    .learn-toggle { width:100%; text-align:left; display:flex; align-items:center; justify-content:space-between; gap:12px; border:0; background:transparent; padding:14px; cursor:pointer; }
+    .learn-toggle:hover { background:rgba(168,135,104,.07); }
+    .learn-title { display:flex; align-items:center; gap:10px; }
+    .learn-title i { color:var(--accent-2); font-style:normal; }
+    .learn-title strong { font:600 12px var(--display); }
+    .learn-chevron { color:var(--muted); transition:transform .18s; }
+    .learn-card.open .learn-chevron { transform:rotate(180deg); }
+    .learn-content { display:none; padding:0 14px 14px 39px; color:var(--secondary); font-size:11px; }
+    .learn-card.open .learn-content { display:block; }
+    .learn-content p { margin:6px 0; }
+    .learn-content b { color:var(--accent-2); }
+    .about-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin:18px 0; }
+    .about-stat { background:rgba(33,28,25,.45); border:1px solid var(--border); padding:14px; border-radius:10px; }
+    .about-stat strong { display:block; color:var(--highlight); font:17px var(--display); }
+    .about-stat span { color:var(--muted); font-size:10px; }
+    .right-panel { border-left:1px solid rgba(89,70,56,.6); padding:27px 18px; background:rgba(33,28,25,.4); }
+    .right-heading { font:500 10px var(--mono); color:var(--muted); text-transform:uppercase; letter-spacing:1.2px; margin-bottom:13px; }
+    .side-card { border:1px solid rgba(89,70,56,.75); background:rgba(48,39,32,.62); border-radius:12px; padding:14px; margin-bottom:13px; }
+    .model-head { display:flex; gap:9px; align-items:center; margin-bottom:12px; }
+    .model-symbol { width:30px; height:30px; display:grid; place-items:center; color:var(--highlight); background:rgba(168,135,104,.15); border-radius:8px; }
+    .model-head strong { display:block; font-size:11px; }
+    .model-head span { display:block; color:var(--muted); font-size:9px; }
+    .side-metric { display:flex; justify-content:space-between; color:var(--secondary); font-size:10px; padding:6px 0; border-top:1px solid rgba(89,70,56,.42); }
+    .side-metric b { color:var(--highlight); font:10px var(--mono); }
+    .tip-card { color:var(--secondary); font-size:11px; line-height:1.6; }
+    .tip-icon { color:var(--warning); margin-right:6px; }
+    .status-line { display:flex; gap:8px; align-items:center; color:var(--success); font-size:10px; }
+    .status-line i { width:7px; height:7px; background:var(--success); border-radius:50%; }
+    .side-token-bar { height:5px; background:rgba(33,28,25,.9); border-radius:5px; margin-top:8px; overflow:hidden; }
+    .side-token-bar span { display:block; height:100%; width:0; background:var(--accent-2); border-radius:5px; transition:width .2s; }
+    .toast { position:fixed; z-index:30; bottom:22px; left:50%; transform:translate(-50%,20px); opacity:0; pointer-events:none; border:1px solid var(--border); background:#3a2f27; color:var(--text); padding:10px 15px; border-radius:9px; box-shadow:var(--shadow); font-size:12px; transition:.2s; }
+    .toast.show { transform:translate(-50%,0); opacity:1; }
+    .footer-note { color:var(--muted); font-size:10px; margin-top:22px; }
+    @media(max-width:1180px) {
+      .app-shell { grid-template-columns:220px minmax(0,1fr); }
+      .right-panel { display:none; }
+      .setting-grid { grid-template-columns:repeat(2,1fr); }
+    }
+    @media(max-width:760px) {
+      .app-shell { display:block; }
+      .sidebar { position:fixed; left:-270px; width:250px; transition:left .22s; box-shadow:var(--shadow); }
+      .sidebar.open { left:0; }
+      #sidebarToggle { display:grid; }
+      .workspace { padding:0 18px 36px; }
+      .topbar { height:64px; margin-bottom:24px; }
+      .mobile-brand { display:block; font:600 13px var(--display); margin-right:auto; margin-left:10px; }
+      .breadcrumb { display:none; }
+      .play-layout,.prompt-lab-grid,.analyzer-grid,.two-col,.parameter-page-grid { grid-template-columns:1fr; }
+      .settings-card { grid-column:auto; }
+      .setting-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+      .learning-grid { grid-template-columns:1fr; }
+      .workflow { grid-template-columns:1fr; }
+      .workflow-step:not(:last-child)::after { content:"↓"; right:50%; top:auto; bottom:-16px; }
+      .search-controls { grid-template-columns:auto 1fr; }
+      .search-controls .btn { grid-column:1/-1; }
+    }
+    @media(max-width:440px) {
+      .setting-grid { grid-template-columns:1fr; }
+      .example-compare { grid-template-columns:1fr; }
+      .example-pair { grid-template-columns:1fr; }
+      .remove-example { justify-self:start; }
+      .about-stats { grid-template-columns:1fr; }
+      .top-actions .sim-chip { font-size:9px; }
+      .embedding-stage { height:300px; }
+    }
+    @media(prefers-reduced-motion:reduce) {
+      *,*::before,*::after { scroll-behavior:auto!important; animation-duration:.01ms!important; transition-duration:.01ms!important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Main navigation">
+      <a class="brand" href="#" aria-label="LLM Explorer home" data-page="playground">
+        <span class="brand-mark">L</span><span class="brand-name">LLM <span>Explorer</span></span>
+      </a>
+      <div class="nav-label">Workspace</div>
+      <nav class="nav-list" aria-label="Explorer tools">
+        <button class="nav-item active" data-page="playground"><span class="nav-icon">⌘</span><span>Playground</span></button>
+        <button class="nav-item" data-page="parameters"><span class="nav-icon">◉</span><span>Model Parameters</span></button>
+        <button class="nav-item" data-page="prompts"><span class="nav-icon">✎</span><span>Prompt Engineering</span></button>
+        <button class="nav-item" data-page="analyzer"><span class="nav-icon">⌕</span><span>Prompt Analyzer</span></button>
+        <button class="nav-item" data-page="tokenizer"><span class="nav-icon">▦</span><span>Tokenizer</span></button>
+        <button class="nav-item" data-page="embeddings"><span class="nav-icon">⠿</span><span>Embeddings</span></button>
+        <button class="nav-item" data-page="reasoning"><span class="nav-icon">◌</span><span>Reasoning Explorer</span></button>
+        <button class="nav-item" data-page="search"><span class="nav-icon">⌖</span><span>Web Search</span></button>
+      </nav>
+      <div class="nav-label" style="margin-top:24px">Discover</div>
+      <nav class="nav-list" aria-label="Learning and information">
+        <button class="nav-item" data-page="learning"><span class="nav-icon">▤</span><span>Learning Center</span></button>
+        <button class="nav-item" data-page="about"><span class="nav-icon">ⓘ</span><span>About</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="sidebar-note"><strong><span class="note-dot"></span>Groq playground</strong>Try live model responses; the other learning modules remain local and illustrative.</div>
+      </div>
+    </aside>
+    <main class="workspace">
+      <header class="topbar">
+        <button class="icon-button" id="sidebarToggle" aria-label="Toggle navigation" aria-expanded="false">☰</button>
+        <div class="mobile-brand">LLM Explorer</div>
+        <div class="breadcrumb">Learning laboratory <span style="color:var(--border);padding:0 7px">/</span> <strong id="currentSection">Playground</strong></div>
+        <div class="top-actions"><span class="sim-chip"><i></i> GROQ API</span></div>
+      </header>
+
+      <section class="page active" id="page-playground" aria-labelledby="title-playground">
+        <div class="page-head"><p class="eyebrow">Interactive lab · 01</p><h1 id="title-playground">LLM Playground</h1><p class="lead">Send prompts to a Groq-hosted language model through a server-side API. The API key stays in your deployment environment and is never sent to the browser.</p></div>
+        <div class="play-layout">
+          <section class="card editor-card">
+            <div class="card-head"><div class="card-title"><span class="card-icon">✎</span><h3>Prompt workspace</h3></div><span class="pill">EDITABLE</span></div>
+            <label class="editor-label" for="systemPrompt">System prompt <span class="muted" title="Sets the assistant's role or response style">ⓘ</span></label>
+            <textarea id="systemPrompt" class="system-text" placeholder="Set a role or response style…">You are a clear, thoughtful AI tutor. Explain ideas with a helpful example.</textarea>
+            <label class="editor-label" for="userPrompt">Your prompt <span class="muted">Required</span></label>
+            <textarea id="userPrompt" class="user-text" placeholder="Ask a question or describe a task…">Explain how a language model chooses its next word.</textarea>
+            <div class="examples-row"><span class="muted small">Try an example:</span>
+              <button class="text-button" data-example="tokens">Tokens</button><button class="text-button" data-example="temperature">Temperature</button><button class="text-button" data-example="attention">Attention</button>
+            </div>
+            <div class="button-row"><button class="btn btn-primary" id="generateBtn">↗ &nbsp;Generate response</button><button class="btn btn-quiet" id="resetPlayground">Reset</button></div>
+          </section>
+          <section class="card output-card">
+            <div class="card-head"><div class="card-title"><span class="card-icon">◈</span><h3>Model output</h3></div><button class="btn btn-sm btn-quiet" id="copyOutput" disabled>Copy output</button></div>
+            <div class="output-empty" id="outputEmpty"><div class="empty-icon">✧</div><strong>Ready when you are</strong><span class="small">Send a prompt to get a response from the configured Groq model.</span></div>
+            <div class="output-body" id="outputBody" aria-live="polite"></div>
+            <div class="output-meta"><span id="outputStatus">No run yet</span><span id="outputTokens">— tokens</span></div>
+          </section>
+          <section class="card settings-card">
+            <div class="card-head"><div class="card-title"><span class="card-icon">⚙</span><h3>Generation settings</h3></div><button class="btn btn-sm btn-quiet reset-params">Reset parameters</button></div>
+            <div class="setting-grid" id="playSettings"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="page" id="page-parameters" aria-labelledby="title-parameters">
+        <div class="page-head"><p class="eyebrow">Concepts · 02</p><h1 id="title-parameters">Model parameters</h1><p class="lead">Tune the playground's temperature, Top-P, and output budget. Top-K and the candidate-space visualizations are educational examples, not live model controls.</p></div>
+        <div class="parameter-page-grid" id="parameterDetails"></div>
+      </section>
+
+      <section class="page" id="page-prompts" aria-labelledby="title-prompts">
+        <div class="page-head"><p class="eyebrow">Prompt craft · 03</p><h1 id="title-prompts">Prompt engineering lab</h1><p class="lead">Compare ways of instructing a model. Switch strategies, edit the instruction, and see the assembled prompt update instantly.</p></div>
+        <div class="prompt-modes" role="tablist" aria-label="Prompt strategy">
+          <button class="mode-tab active" role="tab" aria-selected="true" data-mode="zero">Zero-shot</button>
+          <button class="mode-tab" role="tab" aria-selected="false" data-mode="one">One-shot</button>
+          <button class="mode-tab" role="tab" aria-selected="false" data-mode="few">Few-shot</button>
+        </div>
+        <div class="prompt-lab-grid">
+          <section class="card prompt-pane">
+            <div class="card-head"><div class="card-title"><span class="card-icon">✎</span><h3 id="modeTitle">Zero-shot instruction</h3></div><span class="pill" id="modePill">NO EXAMPLES</span></div>
+            <p class="small muted" id="modeDescription" style="margin-bottom:13px"></p>
+            <label class="editor-label" for="labInstruction">Instruction</label><textarea id="labInstruction"></textarea>
+            <div id="examplesEditor" class="example-editor"></div>
+            <div class="button-row"><button class="btn btn-sm" id="addExample">＋ Add example</button></div>
+          </section>
+          <section class="card prompt-pane">
+            <div class="card-head"><div class="card-title"><span class="card-icon">▤</span><h3>Assembled prompt</h3></div><button class="btn btn-sm btn-quiet" id="copyPrompt">Copy prompt</button></div>
+            <div class="assembled" id="assembledPrompt" aria-live="polite"></div>
+            <div class="count-line"><span>Approximate word-based estimate</span><span id="promptTokenCount">0 tokens</span></div>
+            <p class="footer-note">Examples show the pattern in context; real tokenization varies by model.</p>
+          </section>
+        </div>
+      </section>
+
+      <section class="page" id="page-analyzer" aria-labelledby="title-analyzer">
+        <div class="page-head"><p class="eyebrow">Prompt craft · 04</p><h1 id="title-analyzer">Prompt analyzer</h1><p class="lead">Get transparent, rule-based feedback on a prompt's structure. Scores are heuristic learning aids, not an AI model assessment.</p></div>
+        <div class="analyzer-grid">
+          <section class="card analyzer-input"><div class="card-head"><h3>Analyze a prompt</h3><span class="pill">HEURISTIC</span></div><textarea id="analyzerPrompt" placeholder="Write or paste a prompt to inspect…"></textarea><div class="button-row"><button class="btn btn-primary" id="analyzeBtn">Analyze prompt</button><button class="btn btn-quiet" id="improveBtn">Improve prompt</button></div><div class="notice">This tool checks visible text patterns and structure only. It does not understand meaning like an LLM.</div></section>
+          <section class="card analysis-result"><div class="score-overview"><div class="score-ring" id="scoreValue">—<span>/100</span></div><div><div class="score-label">Overall prompt score</div><p id="scoreSummary">Add a prompt to see its structure breakdown.</p></div></div><div id="scoreRows"></div><div class="suggestions"><h3>Actionable suggestions</h3><ul id="suggestionList"><li>Specific tasks and constraints make prompts easier to follow.</li></ul></div></section>
+        </div>
+      </section>
+
+      <section class="page" id="page-tokenizer" aria-labelledby="title-tokenizer">
+        <div class="page-head"><p class="eyebrow">Text mechanics · 05</p><h1 id="title-tokenizer">Tokenizer visualizer</h1><p class="lead">Explore how text can be represented as smaller pieces. This deliberately simple word-and-punctuation approximation is not a real model tokenizer.</p></div>
+        <section class="card token-input-card"><div class="card-head"><div class="card-title"><span class="card-icon">▦</span><h3>Text to explore</h3></div><span class="pill">APPROXIMATION</span></div><textarea id="tokenInput" placeholder="Type or paste text to visualize an approximate token split…"></textarea><div class="token-stats"><span class="stat-chip"><strong id="charCount">0</strong> characters</span><span class="stat-chip"><strong id="wordCount">0</strong> words</span><span class="stat-chip"><strong id="tokenCount">0</strong> approximate pieces</span></div><div class="button-row" style="margin-top:0"><button class="btn btn-quiet" id="resetTokens">Reset text</button><span class="muted small">Load sample:</span><button class="text-button token-sample" data-sample="A transformer reads text as a sequence of tokens.">Transformer</button><button class="text-button token-sample" data-sample="Unbelievable ideas can be represented with smaller subword pieces.">Subwords</button></div></section>
+        <section class="card token-results" style="margin-top:15px"><div class="card-head"><h3>Approximate pieces</h3><span class="small muted">Illustrative split · not model tokenization</span></div><div class="token-cloud" id="tokenCloud"><span class="muted small">Your text pieces will appear here.</span></div><div class="notice">Real tokenizers use learned vocabularies and may split a word into subword units. Whitespace-based counting is only a rough estimate; token counts vary by model and language.</div></section>
+        <div class="two-col" style="margin-top:15px"><article class="card parameter-detail"><h3>What is a token?</h3><p>A token is a unit of text a model processes. It can be a whole word, part of a word, punctuation, or a space-connected fragment.</p></article><article class="card parameter-detail"><h3>Why not just count words?</h3><p>Models operate over token IDs from a vocabulary. Common words may be one token; rare or long words may use several, so token count and word count differ.</p></article></div>
+      </section>
+
+      <section class="page" id="page-embeddings" aria-labelledby="title-embeddings">
+        <div class="page-head"><p class="eyebrow">Text representation · 06</p><h1 id="title-embeddings">Embedding explorer</h1><p class="lead">A playful two-dimensional map of illustrative coordinates. These points are hand-placed for teaching and are not actual model-generated embeddings.</p></div>
+        <div class="two-col">
+          <section class="card embedding-card"><div class="card-head"><h3>Illustrative semantic space</h3><button class="btn btn-sm btn-quiet" id="resetEmbedding">Reset view</button></div>
+            <div class="embedding-stage"><svg viewBox="0 0 600 380" role="img" aria-label="Illustrative plot of ten words in a two-dimensional coordinate space" id="embeddingSvg">
+              <line class="gridline" x1="80" y1="70" x2="540" y2="70"/><line class="gridline" x1="80" y1="130" x2="540" y2="130"/><line class="gridline" x1="80" y1="190" x2="540" y2="190"/><line class="gridline" x1="80" y1="250" x2="540" y2="250"/><line class="gridline" x1="80" y1="310" x2="540" y2="310"/>
+              <line class="gridline" x1="150" y1="45" x2="150" y2="330"/><line class="gridline" x1="240" y1="45" x2="240" y2="330"/><line class="gridline" x1="330" y1="45" x2="330" y2="330"/><line class="gridline" x1="420" y1="45" x2="420" y2="330"/><line class="gridline" x1="510" y1="45" x2="510" y2="330"/>
+              <line class="axis" x1="80" y1="330" x2="540" y2="330"/><line class="axis" x1="80" y1="45" x2="80" y2="330"/>
+              <g id="embeddingPoints"></g>
+            </svg></div><div class="legend"><span><i style="background:#c7a98a"></i>People</span><span><i style="background:#9aaf91"></i>Animals</span><span><i style="background:#d1a66a"></i>Food</span><span><i style="background:#c77d70"></i>Transport</span></div><div class="embedding-tooltip" id="embeddingTooltip" aria-live="polite">Hover over or focus a point to inspect its illustrative coordinates.</div>
+          </section>
+          <section class="card embedding-info"><h3>What embeddings represent</h3><p class="muted small" style="margin-top:8px">An embedding maps a token or other item to a vector of numbers. In a learned space, related contexts can produce vectors with useful geometric relationships.</p><div class="example-box" style="margin-top:14px"><b>ANALOGY</b>Imagine a map where nearby places share some qualities. An embedding space is a much higher-dimensional numerical map, learned from data.</div><div class="example-box" style="margin-top:9px"><b>SIMILARITY</b>Similarity can be estimated by comparing vector direction or distance. This chart is only a 2D teaching illustration; it does not encode real semantic measurements.</div><div class="notice">The plotted positions are illustrative sample coordinates. Do not interpret them as an embedding from any particular model.</div></section>
+        </div>
+      </section>
+
+      <section class="page" id="page-reasoning" aria-labelledby="title-reasoning">
+        <div class="page-head"><p class="eyebrow">Conceptual flow · 07</p><h1 id="title-reasoning">Reasoning explorer</h1><p class="lead">Walk through a simplified processing pipeline. Expand a stage for more context or animate the conceptual sequence.</p></div>
+        <section class="card reasoning-intro"><div class="card-head"><div><h3>From prompt to response</h3><p class="small muted" style="margin-top:3px">A conceptual overview — not a trace of any model's private thoughts.</p></div><button class="btn btn-primary" id="runPipeline">▶ &nbsp;Animate pipeline</button></div><div class="pipeline" id="pipeline"></div><div class="notice">This educational visualization does not reveal or fabricate private chain-of-thought. It shows high-level stages used to explain language-model behavior.</div></section>
+      </section>
+
+      <section class="page" id="page-search" aria-labelledby="title-search">
+        <div class="page-head"><p class="eyebrow">Grounding concepts · 08</p><h1 id="title-search">Web search explorer</h1><p class="lead">See where retrieval can fit into a language-model workflow. There is no search provider connected here, so no live results are fetched or invented.</p></div>
+        <section class="card search-card"><div class="card-head"><div><h3>Search workflow</h3><p class="small muted" style="margin-top:3px">Simulation only · no external requests</p></div><span class="pill">NO PROVIDER CONNECTED</span></div>
+          <div class="search-controls"><label for="searchToggle" class="small">Search simulation</label><input id="searchToggle" class="switch" type="checkbox" role="switch" aria-label="Enable search workflow simulation"><input id="searchQuery" type="search" placeholder="Enter a sample query (not sent anywhere)" aria-label="Search query"><button class="btn btn-primary" id="runSearch">Run workflow</button></div>
+          <div class="workflow" id="searchWorkflow">
+            <div class="workflow-step"><span>⌕</span><b>User query</b>Question entered</div><div class="workflow-step"><span>↗</span><b>Search engine</b>Would retrieve pages</div><div class="workflow-step"><span>▤</span><b>Documents</b>External sources</div><div class="workflow-step"><span>⊞</span><b>Context assembly</b>Relevant excerpts</div><div class="workflow-step"><span>✧</span><b>LLM response</b>Grounded answer</div>
+          </div>
+          <div class="side-card"><div class="status-line" id="searchStatus"><i></i><span>Workflow idle — enable the simulation to explore the stages.</span></div></div>
+          <div class="notice">A real web-search feature requires an external search API or integration. With none connected, this module only illustrates workflow steps and intentionally does not display fabricated results.</div>
+        </section>
+        <div class="two-col" style="margin-top:15px"><article class="card parameter-detail"><h3>Retrieval-augmented generation</h3><p>RAG retrieves relevant external information and supplies it as context to a model. This can help ground a response in selected sources, but retrieval quality matters.</p></article><article class="card parameter-detail"><h3>Search is not the same as generation</h3><p>A search system finds documents; a language model generates text. A product can combine them, but should distinguish sourced evidence from generated explanation.</p></article></div>
+      </section>
+
+      <section class="page" id="page-learning" aria-labelledby="title-learning">
+        <div class="page-head"><p class="eyebrow">Knowledge library · 09</p><h1 id="title-learning">Learning center</h1><p class="lead">Short, beginner-friendly explanations to help connect the experiments to core language-model ideas. Expand a card to explore it.</p></div>
+        <div class="learning-grid" id="learningGrid"></div>
+      </section>
+
+      <section class="page" id="page-about" aria-labelledby="title-about">
+        <div class="page-head"><p class="eyebrow">About this lab · 10</p><h1 id="title-about">Learn by experimenting</h1><p class="lead">LLM Explorer is a self-contained learning interface for exploring language-model concepts through simple, transparent interactions.</p></div>
+        <section class="card about-card"><h2>Built for curiosity, not black boxes.</h2><p class="muted" style="margin-top:10px;max-width:680px">The playground sends prompts to a Groq-hosted model through a server-side endpoint. Other learning modules run locally in your browser. The API key is configured as a deployment secret and is never included in the page.</p><div class="about-stats"><div class="about-stat"><strong>10</strong><span>interactive learning areas</span></div><div class="about-stat"><strong>1</strong><span>model-backed playground</span></div><div class="about-stat"><strong>9</strong><span>local learning modules</span></div></div><div class="notice">Important: model responses can be inaccurate. Verify important claims; the other learning modules are illustrative.</div></section>
+      </section>
+    </main>
+    <aside class="right-panel" aria-label="Model configuration and learning tips">
+      <div class="right-heading">Session overview</div>
+      <div class="side-card"><div class="model-head"><div class="model-symbol">✧</div><div><strong>Groq chat model</strong><span>Server-side API · key not exposed</span></div></div><div class="side-metric"><span>Mode</span><b>Live model</b></div><div class="side-metric"><span>Output budget</span><b id="sideMaxTokens">512 tokens</b></div><div class="side-metric"><span>Last run</span><b id="sideRunStatus">Not started</b></div></div>
+      <div class="right-heading">Parameters</div>
+      <div class="side-card"><div class="side-metric"><span>Temperature</span><b id="sideTemperature">0.7</b></div><div class="side-metric"><span>Top-P</span><b id="sideTopP">1.00</b></div><div class="side-metric"><span>Top-K</span><b id="sideTopK">40</b></div><div class="side-metric"><span>Token budget</span><b id="sideBudget">512</b></div></div>
+      <div class="right-heading">Input usage · estimate</div>
+      <div class="side-card"><div class="side-metric"><span>Prompt pieces</span><b id="sideInputTokens">0</b></div><div class="side-token-bar"><span id="sideTokenBar"></span></div><p class="small muted" style="margin-top:8px">Approximate word count, not a model tokenizer.</p></div>
+      <div class="right-heading">Learning tip</div>
+      <div class="side-card tip-card"><span class="tip-icon">✦</span><span id="learningTip">Try changing one parameter at a time to see its conceptual effect.</span></div>
+      <div class="right-heading">Connection</div>
+      <div class="side-card"><div class="status-line"><i></i><span>Playground uses the server API; learning modules run locally.</span></div></div>
+    </aside>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script>
+    "use strict";
+    const defaults = { temperature: 0.7, maxTokens: 512, topP: 1, topK: 40 };
+    const params = { ...defaults };
+    const parameterMeta = [
+      { key:"temperature", label:"Temperature", min:0, max:2, step:.1, value:defaults.temperature, note:"Higher values broaden variation; lower values favor more predictable choices." },
+      { key:"maxTokens", label:"Max tokens", min:1, max:4096, step:1, value:defaults.maxTokens, note:"Sets the maximum response length requested from the live playground model." },
+      { key:"topP", label:"Top-P", min:0, max:1, step:.01, value:defaults.topP, note:"Controls nucleus sampling for the live playground." },
+      { key:"topK", label:"Top-K", min:1, max:100, step:1, value:defaults.topK, note:"Illustrative only; the Groq chat API does not expose a Top-K control." }
+    ];
+    const tips = [
+      "Try changing one parameter at a time to see its conceptual effect.",
+      "A concrete output format can make a prompt easier to follow.",
+      "A token can be a word, a word fragment, or punctuation.",
+      "Embeddings are vectors; this lab's plotted points are illustrative only."
+    ];
+    let tipIndex=0, toastTimer, generationTimer, pipelineTimer;
+    const $ = (selector, root=document) => root.querySelector(selector);
+    const $$ = (selector, root=document) => [...root.querySelectorAll(selector)];
+    function showToast(message) {
+      const toast=$("#toast"); toast.textContent=message; toast.classList.add("show");
+      clearTimeout(toastTimer); toastTimer=setTimeout(()=>toast.classList.remove("show"),2200);
+    }
+    async function copyText(text) {
+      if (!text.trim()) { showToast("There is nothing to copy yet."); return; }
+      try {
+        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+        else {
+          const field=document.createElement("textarea"); field.value=text; field.style.position="fixed"; field.style.opacity="0"; document.body.append(field); field.select();
+          const copied=document.execCommand("copy"); field.remove(); if(!copied) throw new Error("Clipboard unavailable");
+        }
+        showToast("Copied to clipboard.");
+      } catch (error) { console.error("Copy failed:",error); showToast("Could not copy. Select and copy the text manually."); }
+    }
+    function renderParameterControls(target, compact=false) {
+      $(target).innerHTML=parameterMeta.map(m=>`<div class="setting-mini"><div class="setting-top"><label for="${compact?"play-":""}${m.key}">${m.label}</label><span class="setting-value" id="${compact?"play-val-":""}${m.key}">${formatParam(m.key,params[m.key])}</span></div><input type="range" id="${compact?"play-":""}${m.key}" data-param="${m.key}" min="${m.min}" max="${m.max}" step="${m.step}" value="${params[m.key]}" aria-label="${m.label}"><div class="range-limits"><span>${m.min}</span><span>${m.max}</span></div>${compact?`<p class="setting-note">${m.note}</p>`:""}</div>`).join("");
+      $$('input[type="range"][data-param]',$(target)).forEach(input=>input.addEventListener("input",()=>updateParameter(input.dataset.param,Number(input.value))));
+    }
+    function formatParam(key,value) { return key==="topP" ? Number(value).toFixed(2) : key==="temperature" ? Number(value).toFixed(1) : String(value); }
+    function updateParameter(key,value) {
+      params[key]=value;
+      $$(`[data-param="${key}"]`).forEach(input=>{ if(Number(input.value)!==value) input.value=value; });
+      $$(`[id$="${key}"]`).forEach(el=>{ if(el.classList.contains("setting-value")) el.textContent=formatParam(key,value); });
+      $("#sideTemperature").textContent=formatParam("temperature",params.temperature);
+      $("#sideTopP").textContent=formatParam("topP",params.topP);
+      $("#sideTopK").textContent=formatParam("topK",params.topK);
+      $("#sideMaxTokens").textContent=`${params.maxTokens} tokens`; $("#sideBudget").textContent=params.maxTokens;
+      drawCandidates();
+    }
+    function resetParams() { Object.assign(params,defaults); parameterMeta.forEach(p=>updateParameter(p.key,defaults[p.key])); showToast("Parameters reset to defaults."); }
+    function updateInputUsage() {
+      const text=($("#systemPrompt")?.value||"")+" "+($("#userPrompt")?.value||"");
+      const count=(text.trim().match(/\S+/g)||[]).length;
+      $("#sideInputTokens").textContent=count; $("#sideTokenBar").style.width=Math.min(100,count/Math.max(1,params.maxTokens)*100)+"%";
+    }
+    renderParameterControls("#playSettings",true);
+    renderParameterControls("#parameterDetails",false);
+    $$(".reset-params").forEach(button=>button.addEventListener("click",resetParams));
+    $("#systemPrompt").addEventListener("input",updateInputUsage);
+    $("#userPrompt").addEventListener("input",updateInputUsage);
+    updateInputUsage();
+
+    const parameterInfo = {
+      temperature:["Temperature controls how strongly a generation process favors the highest-probability next-token candidates. The playground sends this value to the model; a low value tends to concentrate choices and a high value can allow more variety.","LOW · 0.1","A restrained, more predictable phrasing.","HIGH · 1.8","A broader range of plausible phrasings may be considered."],
+      maxTokens:["A token budget limits how much output a model may produce. The playground sends this limit to the model. It counts tokenizer units, not exactly words or characters.","SMALL BUDGET","A response may stop before all details fit.","LARGE BUDGET","More room is available for explanation, though not a guarantee of quality."],
+      topP:["Nucleus sampling keeps a probability-ranked group of candidates until their cumulative probability reaches P. The playground sends this value to the model; these candidate chips remain a simplified illustration.","LOWER P","Keeps a narrower high-probability nucleus.","HIGHER P","Allows a broader cumulative candidate set."],
+      topK:["Top-K sampling limits the candidate pool to the K most probable next-token choices. Real systems may combine or configure sampling methods differently; this visualization uses a fixed illustrative list.","CANDIDATE POOL","A smaller K narrows the available choices.","CURRENT SET","Highlighted candidates illustrate a possible truncated pool."]
+    };
+    Object.keys(parameterInfo).forEach(key=>{
+      const m=parameterInfo[key], card=document.createElement("article"); card.className="card parameter-detail";
+      card.innerHTML=`<div class="card-head"><h3>${key==="maxTokens"?"Max tokens":key==="topP"?"Top-P (nucleus)":key==="topK"?"Top-K": "Temperature"}</h3><span class="setting-value" id="detail-${key}">${formatParam(key,params[key])}</span></div><p>${m[0]}</p>${key==="topK"||key==="topP"?'<div class="candidate-list" id="candidateList"></div>':`<div class="example-compare"><div class="example-box"><b>${m[1]}</b>${m[2]}</div><div class="example-box"><b>${m[3]}</b>${m[4]}</div></div>`}`;
+      $("#parameterDetails").append(card);
+    });
+    const updateOriginal=updateParameter;
+    updateParameter=function(key,value){ updateOriginal(key,value); const el=$(`#detail-${key}`); if(el) el.textContent=formatParam(key,value); };
+    function drawCandidates() {
+      const list=$("#candidateList"); if(!list)return;
+      const items=[["the",.31],["a",.2],["their",.14],["our",.11],["one",.09],["some",.07],["this",.05],["other",.03]];
+      let total=0; let pCount=0; for(const item of items){ total+=item[1]; pCount++; if(total>=params.topP)break; }
+      const count=Math.max(1,Math.min(params.topK,pCount));
+      list.innerHTML=items.map((item,index)=>`<span class="candidate ${index<count?"included":""}" title="Illustrative candidate ${index+1}">${item[0]} · ${Math.round(item[1]*100)}%</span>`).join("");
+    }
+    drawCandidates();
+
+    const examples={
+      tokens:"Explain what a token is in a language model, using a short example.",
+      temperature:"Explain temperature in text generation. Compare a low setting with a high setting in simple terms.",
+      attention:"Explain the attention mechanism in a transformer using an everyday analogy."
+    };
+    $$(".text-button[data-example]").forEach(button=>button.addEventListener("click",()=>{$("#userPrompt").value=examples[button.dataset.example]; updateInputUsage(); $("#userPrompt").focus();}));
+    let generationController;
+    $("#generateBtn").addEventListener("click",async()=>{
+      const user=$("#userPrompt").value, system=$("#systemPrompt").value;
+      if(!user.trim()){showToast("Add a user prompt before generating.");$("#userPrompt").focus();return;}
+      clearInterval(generationTimer);
+      generationController?.abort();
+      const controller=new AbortController(); generationController=controller;
+      $("#outputEmpty").style.display="none"; const body=$("#outputBody"); body.style.display="block"; body.textContent="Waiting for model response…";
+      $("#generateBtn").disabled=true; $("#outputStatus").textContent="Connecting…"; $("#sideRunStatus").textContent="Running"; $("#copyOutput").disabled=true;
+      try {
+        const response=await fetch("/api/chat",{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({system,user,temperature:params.temperature,topP:params.topP,maxTokens:params.maxTokens}),
+          signal:controller.signal
+        });
+        const result=await response.json();
+        if(!response.ok) throw new Error(result.error||`Request failed (${response.status}).`);
+        if(typeof result.output!=="string"||!result.output.trim()) throw new Error("The model returned an empty response.");
+        if(controller.signal.aborted)return;
+        const output=result.output, chars=output.split(""); let at=0; body.textContent=""; $("#outputStatus").textContent="Receiving response…";
+        generationTimer=setInterval(()=>{body.textContent+=chars.slice(at,at+5).join("");at+=5;if(at>=chars.length){clearInterval(generationTimer);generationController=null;$("#generateBtn").disabled=false;$("#outputStatus").textContent="Response complete";$("#sideRunStatus").textContent="Complete";$("#outputTokens").textContent=`~${Math.ceil(output.split(/\s+/).length*1.35)} tokens`;$("#copyOutput").disabled=false;}},10);
+      } catch(error) {
+        if(controller.signal.aborted)return;
+        generationController=null; $("#generateBtn").disabled=false; $("#outputStatus").textContent="Request failed"; $("#sideRunStatus").textContent="Failed";
+        body.textContent=`Could not generate a response: ${error.message}`; showToast(error.message);
+      }
+    });
+    $("#copyOutput").addEventListener("click",()=>copyText($("#outputBody").textContent));
+    $("#resetPlayground").addEventListener("click",()=>{generationController?.abort();generationController=null;clearInterval(generationTimer);$("#systemPrompt").value="You are a clear, thoughtful AI tutor. Explain ideas with a helpful example.";$("#userPrompt").value="";$("#outputBody").textContent="";$("#outputBody").style.display="none";$("#outputEmpty").style.display="flex";$("#outputStatus").textContent="No run yet";$("#outputTokens").textContent="— tokens";$("#sideRunStatus").textContent="Not started";$("#copyOutput").disabled=true;$("#generateBtn").disabled=false;updateInputUsage();showToast("Playground reset.");});
+
+    const modes={
+      zero:{title:"Zero-shot instruction",pill:"NO EXAMPLES",description:"Give a direct instruction without demonstrations. Useful when the task is clear or examples are not needed.",instruction:"Explain the idea of a language-model token to a curious beginner. Use a simple analogy and one short example.",examples:[]},
+      one:{title:"One-shot instruction",pill:"ONE EXAMPLE",description:"Show exactly one input-output example to demonstrate the desired pattern, then provide a new input.",instruction:"Classify the tone of the message as positive, neutral, or negative. Return only the label.",examples:[{input:"Message: I had a wonderful time.",output:"positive"}]},
+      few:{title:"Few-shot instruction",pill:"MULTIPLE EXAMPLES",description:"Provide several demonstrations so the model can infer a pattern from multiple cases.",instruction:"Classify the tone of each message as positive, neutral, or negative. Return only the label.",examples:[{input:"Message: That was incredibly helpful.",output:"positive"},{input:"Message: The package arrived yesterday.",output:"neutral"},{input:"Message: I am disappointed with the service.",output:"negative"}]}
+    };
+    let activeMode="zero", labExamples=[];
+    function renderExamples() {
+      const host=$("#examplesEditor"); host.innerHTML="";
+      labExamples.forEach((item,index)=>{
+        const pair=document.createElement("div"); pair.className="example-pair";
+        pair.innerHTML=`<textarea aria-label="Example ${index+1} input" placeholder="Example input"></textarea><textarea aria-label="Example ${index+1} output" placeholder="Example output"></textarea><button class="remove-example" type="button" aria-label="Remove example ${index+1}" title="Remove example">×</button>`;
+        const fields=$$("textarea",pair);fields[0].value=item.input;fields[1].value=item.output;
+        fields[0].addEventListener("input",()=>{labExamples[index].input=fields[0].value;assemblePrompt();});
+        fields[1].addEventListener("input",()=>{labExamples[index].output=fields[1].value;assemblePrompt();});
+        $(".remove-example",pair).addEventListener("click",()=>{if(activeMode==="one"&&labExamples.length===1){showToast("One-shot mode keeps exactly one example.");return;}labExamples.splice(index,1);renderExamples();assemblePrompt();});
+        host.append(pair);
+      });
+      $("#addExample").style.display=activeMode==="zero"?"none":"inline-block";
+    }
+    function assemblePrompt() {
+      const sections=[$("#labInstruction").value.trim()];
+      labExamples.forEach((ex,i)=>{if(ex.input.trim()||ex.output.trim())sections.push(`Example ${i+1}\nInput: ${ex.input}\nOutput: ${ex.output}`);});
+      if(activeMode==="one"&&labExamples.length) sections.push("Now apply the same pattern to:\nInput: [your new input]");
+      if(activeMode==="few"&&labExamples.length) sections.push("Now apply the pattern to:\nInput: [your new input]");
+      const assembled=sections.filter(Boolean).join("\n\n");
+      $("#assembledPrompt").textContent=assembled||"Your assembled prompt will appear here.";
+      $("#promptTokenCount").textContent=`~${(assembled.match(/\S+/g)||[]).length} tokens`;
+    }
+    function setMode(mode) {
+      activeMode=mode;const data=modes[mode];labExamples=data.examples.map(ex=>({...ex}));
+      $$(".mode-tab").forEach(tab=>{const selected=tab.dataset.mode===mode;tab.classList.toggle("active",selected);tab.setAttribute("aria-selected",selected);});
+      $("#modeTitle").textContent=data.title;$("#modePill").textContent=data.pill;$("#modeDescription").textContent=data.description;$("#labInstruction").value=data.instruction;
+      renderExamples();assemblePrompt();
+    }
+    $$(".mode-tab").forEach(tab=>tab.addEventListener("click",()=>setMode(tab.dataset.mode)));
+    $("#labInstruction").addEventListener("input",assemblePrompt);
+    $("#addExample").addEventListener("click",()=>{if(activeMode==="one"&&labExamples.length>=1){showToast("One-shot mode contains exactly one example.");return;}labExamples.push({input:"",output:""});renderExamples();assemblePrompt();});
+    $("#copyPrompt").addEventListener("click",()=>copyText($("#assembledPrompt").textContent));
+    setMode("zero");
+
+    const analyzerCategories=["Clarity","Specificity","Context","Instructions","Output format","Ambiguity"];
+    function analyzePrompt(text) {
+      const t=text.trim(), lower=t.toLowerCase(), words=t.split(/\s+/).filter(Boolean);
+      if(!t) return null;
+      const hasTask=/\b(explain|write|summarize|compare|list|describe|translate|classify|create|analy[sz]e|generate|define|outline|review|rewrite)\b/i.test(t);
+      const specificity=(/\b\d+\b/.test(t)?1:0)+(/\b(for|about|using|between|including|such as|because|audience|beginner|expert)\b/i.test(t)?1:0)+(/".+"/.test(t)?1:0);
+      const context=(/\b(for|as a|in the context|assume|background|audience|because|given|based on)\b/i.test(t)?1:0)+ (words.length>20?1:0);
+      const instructions=(/\b(please|must|should|include|avoid|use|don't|do not|ensure|keep|limit|step|format)\b/i.test(t)?1:0)+(/\b(first|then|finally|only|exactly)\b/i.test(t)?1:0);
+      const format=/\b(bullet|json|table|paragraph|steps|list|format|headline|one sentence|markdown|csv)\b/i.test(t);
+      const vague=(/\b(it|this|that|thing|stuff|good|better|somehow|whatever|etc)\b/i.test(t)?1:0)+(!hasTask?1:0);
+      const scores=[
+        Math.min(100,30+(hasTask?35:0)+(words.length>7?20:0)+(words.length>15?15:0)),
+        Math.min(100,25+specificity*25+(words.length>12?15:0)),
+        Math.min(100,30+context*30+(words.length>18?10:0)),
+        Math.min(100,25+instructions*35+(words.length>10?10:0)),
+        format?88:35,
+        Math.max(20,100-vague*30-(words.length<5?20:0))
+      ];
+      const score=Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+      const suggestions=[];
+      if(!hasTask)suggestions.push("State the action you want (for example: explain, compare, or summarize).");
+      if(!specificity)suggestions.push("Add a concrete subject, scope, audience, or constraint.");
+      if(!context)suggestions.push("Add relevant background or say who the response is for.");
+      if(!instructions)suggestions.push("Include any important requirements or steps to follow.");
+      if(!format)suggestions.push("Specify a useful output format, such as three bullets or a short table.");
+      if(vague)suggestions.push("Replace vague references with the exact topic or material.");
+      if(!suggestions.length)suggestions.push("This prompt has several useful structural cues. Test it and refine based on the response.");
+      return {scores,score,suggestions,lower};
+    }
+    function renderAnalysis() {
+      const result=analyzePrompt($("#analyzerPrompt").value);
+      if(!result){$("#scoreValue").innerHTML='—<span>/100</span>';$("#scoreSummary").textContent="Add a prompt to see its structure breakdown.";$$("#scoreRows");$("#scoreRows").innerHTML="";$("#suggestionList").innerHTML="<li>Specific tasks and constraints make prompts easier to follow.</li>";return;}
+      $("#scoreValue").innerHTML=`${result.score}<span>/100</span>`;
+      $("#scoreSummary").textContent=result.score>=75?"Strong structural cues; refine against your intended result.":result.score>=50?"Some useful structure is present; add detail in the weaker areas.":"The prompt could benefit from clearer task framing and constraints.";
+      $("#scoreRows").innerHTML=analyzerCategories.map((name,i)=>`<div class="category-row"><span>${name}</span><div class="bar-track"><div class="bar-fill" style="width:${result.scores[i]}%"></div></div><span class="category-score">${result.scores[i]}</span></div>`).join("");
+      $("#suggestionList").innerHTML=result.suggestions.map(s=>`<li>${s}</li>`).join("");
+    }
+    $("#analyzeBtn").addEventListener("click",renderAnalysis);
+    $("#analyzerPrompt").addEventListener("input",renderAnalysis);
+    $("#improveBtn").addEventListener("click",()=>{
+      const current=$("#analyzerPrompt").value.trim(); if(!current){showToast("Enter a prompt to improve.");$("#analyzerPrompt").focus();return;}
+      const task=current.replace(/[.!?]+$/,"");
+      $("#analyzerPrompt").value=`Task: ${task}.\nAudience: A curious beginner.\nRequirements: Be accurate, use plain language, and include one concrete example.\nOutput format: Three concise bullet points.`;
+      renderAnalysis();showToast("Added a clearer task, audience, requirements, and format.");
+    });
+
+    function tokenizeApprox(text) {
+      return text.match(/[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*|[^\sA-Za-z0-9]/gu)||[];
+    }
+    function renderTokens() {
+      const text=$("#tokenInput").value, tokens=tokenizeApprox(text), words=(text.match(/\b[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu)||[]);
+      $("#charCount").textContent=[...text].length;$("#wordCount").textContent=words.length;$("#tokenCount").textContent=tokens.length;
+      const cloud=$("#tokenCloud");
+      cloud.innerHTML=tokens.length?tokens.map((token,i)=>`<span class="token-chip" title="Approximate piece ${i+1}">${escapeHtml(token)}</span>`).join(""):'<span class="muted small">Your text pieces will appear here.</span>';
+    }
+    function escapeHtml(text) { return text.replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char])); }
+    $("#tokenInput").addEventListener("input",renderTokens);
+    $("#resetTokens").addEventListener("click",()=>{$("#tokenInput").value="";renderTokens();$("#tokenInput").focus();});
+    $$(".token-sample").forEach(button=>button.addEventListener("click",()=>{$("#tokenInput").value=button.dataset.sample;renderTokens();}));
+
+    const embeddingData=[
+      {word:"king",x:185,y:91,group:"people",description:"Illustrative person point; placed near queen to hint at a conceptual relationship."},
+      {word:"queen",x:256,y:111,group:"people",description:"Illustrative person point; proximity is a teaching choice, not a measured similarity."},
+      {word:"man",x:164,y:152,group:"people",description:"Illustrative person point in the hand-placed sample map."},
+      {word:"woman",x:241,y:170,group:"people",description:"Illustrative person point in the hand-placed sample map."},
+      {word:"dog",x:383,y:102,group:"animals",description:"Illustrative animal point, grouped visually with cat."},
+      {word:"cat",x:451,y:130,group:"animals",description:"Illustrative animal point; all coordinates are fabricated for teaching."},
+      {word:"apple",x:339,y:218,group:"food",description:"Illustrative food point, near orange by design."},
+      {word:"orange",x:417,y:234,group:"food",description:"Illustrative food point in this educational coordinate plane."},
+      {word:"car",x:190,y:276,group:"transport",description:"Illustrative transport point in a hand-placed 2D map."},
+      {word:"bus",x:278,y:292,group:"transport",description:"Illustrative transport point, placed near car for demonstration."}
+    ];
+    const pointColors={people:"#c7a98a",animals:"#9aaf91",food:"#d1a66a",transport:"#c77d70"};
+    function renderEmbedding() {
+      const group=$("#embeddingPoints");group.innerHTML="";
+      embeddingData.forEach((item,index)=>{
+        const g=document.createElementNS("http://www.w3.org/2000/svg","g");
+        const circle=document.createElementNS("http://www.w3.org/2000/svg","circle");circle.setAttribute("class","point");circle.setAttribute("cx",item.x);circle.setAttribute("cy",item.y);circle.setAttribute("r","6");circle.setAttribute("fill",pointColors[item.group]);circle.setAttribute("tabindex","0");circle.setAttribute("role","button");circle.setAttribute("aria-label",`${item.word}, illustrative ${item.group} coordinate`);
+        const title=document.createElementNS("http://www.w3.org/2000/svg","title");title.textContent=`${item.word} · illustrative coordinates (${((item.x-80)/460).toFixed(2)}, ${((330-item.y)/285).toFixed(2)})`;
+        const label=document.createElementNS("http://www.w3.org/2000/svg","text");label.setAttribute("class","point-label");label.setAttribute("x",item.x+9);label.setAttribute("y",item.y+4);label.textContent=item.word;
+        const show=()=>$("#embeddingTooltip").innerHTML=`<strong style="color:var(--highlight)">${item.word}</strong> · ${item.description} <span class="mono muted">(${((item.x-80)/460).toFixed(2)}, ${((330-item.y)/285).toFixed(2)})</span>`;
+        circle.addEventListener("mouseenter",show);circle.addEventListener("focus",show);circle.addEventListener("click",show);
+        g.append(circle,title,label);group.append(g);
+      });
+    }
+    renderEmbedding();
+    $("#resetEmbedding").addEventListener("click",()=>{$("#embeddingTooltip").textContent="Hover over or focus a point to inspect its illustrative coordinates.";renderEmbedding();showToast("Illustrative map reset.");});
+
+    const pipelineStages=[
+      ["⌕","User input","A person provides text, instructions, or other context.","The input is the visible material supplied to the system. It may include a user request, prior turns, and system-level instructions."],
+      ["▦","Tokenization","Text is mapped into token IDs using a tokenizer.","A tokenizer maps text pieces to discrete IDs. The exact segmentation depends on the model's vocabulary; it is not always one token per word."],
+      ["⊞","Context processing","The model receives a bounded context sequence.","The available context can include input tokens and earlier conversation. Models have limits on how much context they can process at once."],
+      ["⠿","Transformer processing","Layers compute contextual representations using attention and other operations.","Transformer layers update representations through learned computations. This is a high-level conceptual stage, not a view into private internal reasoning."],
+      ["◇","Next-token prediction","The model produces a distribution over possible next tokens.","At each generation step, candidate tokens can be scored and a decoding strategy can choose one. Parameters can affect this selection in real systems."],
+      ["✧","Output generation","Chosen tokens are decoded into a response sequence.","Generation repeats prediction and selection until a stop condition or output limit is reached, then token IDs are decoded to text."]
+    ];
+    $("#pipeline").innerHTML=pipelineStages.map((stage,index)=>`<article class="pipeline-stage" data-stage="${index}"><div class="stage-icon">${stage[0]}</div><div class="stage-copy"><h3>${index+1}. ${stage[1]}</h3><p>${stage[2]}</p></div><button class="stage-expand" aria-expanded="false">Details</button><div class="stage-detail">${stage[3]}</div></article>`).join("");
+    $$(".stage-expand").forEach(button=>button.addEventListener("click",()=>{const stage=button.closest(".pipeline-stage");const open=stage.classList.toggle("expanded");button.setAttribute("aria-expanded",open);button.textContent=open?"Hide":"Details";}));
+    $("#runPipeline").addEventListener("click",()=>{
+      clearInterval(pipelineTimer);const stages=$$(".pipeline-stage");stages.forEach(s=>s.classList.remove("current"));
+      let index=0;$("#runPipeline").disabled=true;
+      pipelineTimer=setInterval(()=>{stages.forEach(s=>s.classList.remove("current"));if(index<stages.length){stages[index].classList.add("current");index++;}else{clearInterval(pipelineTimer);$("#runPipeline").disabled=false;showToast("Conceptual pipeline complete.");}},600);
+    });
+
+    $("#runSearch").addEventListener("click",()=>{
+      const enabled=$("#searchToggle").checked,query=$("#searchQuery").value.trim(),steps=$$(".workflow-step");
+      steps.forEach(s=>s.classList.remove("active","complete"));
+      if(!enabled){$("#searchStatus").innerHTML="<i></i><span>Simulation is off. Turn on the toggle to walk through the conceptual stages.</span>";return;}
+      if(!query){$("#searchStatus").innerHTML="<i></i><span>Enter a query to begin the simulated workflow. It will not be sent anywhere.</span>";$("#searchQuery").focus();return;}
+      $("#searchStatus").innerHTML="<i></i><span>Illustrating workflow for “"+escapeHtml(query)+"” — no live search was performed.</span>";
+      let index=0;steps[0].classList.add("active");
+      const timer=setInterval(()=>{if(index<steps.length){steps[index].classList.remove("active");steps[index].classList.add("complete");index++;if(index<steps.length)steps[index].classList.add("active");}else{clearInterval(timer);$("#searchStatus").innerHTML="<i></i><span>Workflow illustrated. No results were retrieved or invented.</span>";}},470);
+    });
+    $("#searchToggle").addEventListener("change",()=>{if(!$("#searchToggle").checked){$$(".workflow-step").forEach(s=>s.classList.remove("active","complete"));$("#searchStatus").innerHTML="<i></i><span>Workflow idle — enable the simulation to explore the stages.</span>";}});
+    $("#searchQuery").addEventListener("keydown",event=>{if(event.key==="Enter")$("#runSearch").click();});
+
+    const lessons=[
+      ["✧","What is an LLM?","A large language model is a neural network trained on large collections of text to predict and generate sequences of tokens.","Like an autocomplete system with a much richer learned pattern library—not a database that simply looks up a perfect answer.","Given a question, it generates a response one token at a time.","It generates plausible text from learned patterns; verify important claims."],
+      ["⠿","What is a Transformer?","A neural-network architecture that uses attention to process relationships among items in a sequence.","A reading group where each word can take relevant surrounding words into account at once.","Transformers power many current language models.","It is an architecture for contextual sequence processing."],
+      ["⌁","What is an Attention Mechanism?","A learned computation that weights information from different positions when forming a representation.","A reader linking a pronoun to the relevant noun earlier in a sentence.","In “Maya dropped the glass because it was slippery,” context helps connect “it” to the right idea.","Attention computes relationships; it is not human-like focus or understanding."],
+      ["▦","What is a Token?","A discrete unit of text such as a word, word part, punctuation mark, or other vocabulary item.","A set of letter tiles: familiar words may use one tile, while rarer words need several.","“Learning” might be represented as one token or split into pieces depending on the tokenizer.","Models process token IDs, not words as such."],
+      ["⠿","What is an Embedding?","A numeric vector representing a token or item in a learned space.","A coordinate in a map whose dimensions capture patterns learned from data.","Vectors can be compared for similarity within their space.","Embeddings turn symbols into learned numerical representations."],
+      ["◉","What is Temperature?","A decoding parameter that can adjust the concentration of next-token choices.","A dial that makes a shortlist more focused or more exploratory.","Lower temperature often favors likely continuations; higher may allow more variation.","It changes sampling behavior, not a model's underlying knowledge."],
+      ["◉","What is Top-P?","Nucleus sampling retains candidates until their cumulative probability reaches a chosen threshold.","Keep adding likely options to a basket until it contains enough probability mass.","A small P can limit the basket to a few high-probability candidates.","Top-P uses a probability mass threshold to shape the candidate set."],
+      ["◉","What is Top-K?","A sampling method that restricts the choice to the K most likely candidates.","Choose from only the K best-scoring items on a shortlist.","With K=3, a conceptual sampler considers only the top three candidates.","Top-K sets the size of the candidate shortlist."],
+      ["✎","What is Prompt Engineering?","The practice of writing and refining instructions and context to guide a model toward useful outputs.","Giving a colleague a clear brief: task, context, constraints, and deliverable.","“Summarize this for a beginner in three bullets” is more specific than “summarize.”","Clear prompts communicate task and success criteria."],
+      ["⊞","What is RAG?","Retrieval-augmented generation supplies retrieved information as context for a model response.","An open-book assignment: find useful references, then explain using them.","A system retrieves selected passages and places them in the model's context.","RAG joins retrieval and generation; source quality still matters."],
+      ["⌖","What is Web Search in AI?","A tool integration that queries external sources and can bring retrieved material into a model workflow.","A researcher consulting current references before writing a summary.","A search tool returns pages; a model may then summarize those pages with citations.","Live search requires a connected provider and careful source attribution."]
+    ];
+    $("#learningGrid").innerHTML=lessons.map((l,i)=>`<article class="learn-card"><button class="learn-toggle" aria-expanded="false"><span class="learn-title"><i>${l[0]}</i><strong>${l[1]}</strong></span><span class="learn-chevron">⌄</span></button><div class="learn-content"><p><b>In simple terms:</b> ${l[2]}</p><p><b>Analogy:</b> ${l[3]}</p><p><b>Example:</b> ${l[4]}</p><p><b>Key takeaway:</b> ${l[5]}</p></div></article>`).join("");
+    $$(".learn-toggle").forEach(button=>button.addEventListener("click",()=>{const card=button.closest(".learn-card"),open=card.classList.toggle("open");button.setAttribute("aria-expanded",open);}));
+
+    const pageNames={playground:"Playground",parameters:"Model Parameters",prompts:"Prompt Engineering",analyzer:"Prompt Analyzer",tokenizer:"Tokenizer",embeddings:"Embeddings",reasoning:"Reasoning Explorer",search:"Web Search",learning:"Learning Center",about:"About"};
+    function navigate(page) {
+      if(!pageNames[page])return;
+      $$(".page").forEach(el=>el.classList.toggle("active",el.id===`page-${page}`));
+      $$(".nav-item").forEach(el=>el.classList.toggle("active",el.dataset.page===page));
+      $("#currentSection").textContent=pageNames[page];$("#sidebar").classList.remove("open");$("#sidebarToggle").setAttribute("aria-expanded","false");
+      if(page==="analyzer")renderAnalysis();
+      window.scrollTo({top:0,behavior:"smooth"});
+    }
+    $$(".nav-item,[data-page='playground'].brand").forEach(button=>button.addEventListener("click",event=>{event.preventDefault();navigate(button.dataset.page);}));
+    $("#sidebarToggle").addEventListener("click",()=>{const open=$("#sidebar").classList.toggle("open");$("#sidebarToggle").setAttribute("aria-expanded",open);});
+    document.addEventListener("keydown",event=>{if(event.key==="Escape"&&$("#sidebar").classList.contains("open")){$("#sidebar").classList.remove("open");$("#sidebarToggle").setAttribute("aria-expanded","false");}});
+    setInterval(()=>{tipIndex=(tipIndex+1)%tips.length;$("#learningTip").textContent=tips[tipIndex];},12000);
+  </script>
+</body>
+</html>
