@@ -553,7 +553,13 @@
           body:JSON.stringify({system,user,temperature:params.temperature,topP:params.topP,maxTokens:params.maxTokens}),
           signal:controller.signal
         });
-        const result=await response.json();
+        const contentType=response.headers.get("content-type")||"";
+        if(!contentType.includes("application/json")) {
+          throw new Error(`The API returned a webpage instead of JSON (HTTP ${response.status}). Check that Vercel deployed the latest version with the api/ folder.`);
+        }
+        let result;
+        try { result=await response.json(); }
+        catch { throw new Error(`The API returned invalid JSON (HTTP ${response.status}). Check the Vercel function logs.`); }
         if(!response.ok) throw new Error(result.error||`Request failed (${response.status}).`);
         if(typeof result.output!=="string"||!result.output.trim()) throw new Error("The model returned an empty response.");
         if(controller.signal.aborted)return;
